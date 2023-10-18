@@ -35,9 +35,7 @@ export default class Sketch {
 		// Init values
 		this.clock = new THREE.Clock();
 		this.world = null;
-		this.dragId = -1;
 		this.meshBodies = [];
-		this.meshes = [];
 		this.model = null;
 		this.children = [];
 		this.letters = [];
@@ -47,7 +45,6 @@ export default class Sketch {
 		this.draggable = null;
 		this.speedsPos = [1, 0.8, 1.2, 1.4, 1.2];
 		this.speedsRot = [1, 1.1, 1.2, 1.4, 1.2];
-		this.posXBalloon = [];
 		this.lerpMultiplier = 0.005;
 		this.utils = {
 			// maValeur = lerp(maValeur, maValeurTarget, 0.09)
@@ -66,33 +63,12 @@ export default class Sketch {
 
 		// this.addControls();
 
-		// this.addDebug();
-
-		this.cannonDebugger = new CannonDebugger(this.scene, this.world, {});
+		this.addDebug();
 
 		this.render();
 
 		// Resize
 		window.addEventListener('resize', this.resize.bind(this));
-
-		// const dragControls = new DragControls(
-		// 	this.meshes,
-		// 	this.camera,
-		// 	this.renderer.domElement
-		// );
-
-		// dragControls.addEventListener('hoveron', function (event) {
-		// 	this.dragId = event.object.userData.id;
-		// 	// event.object.material.opacity = 0.33;
-		// });
-		// dragControls.addEventListener('hoveroff', function (event) {
-		// 	this.dragId = -1;
-		// 	// event.object.material.opacity = 1;
-		// });
-		// dragControls.addEventListener('drag', function (event) {
-		// 	// event.object.position.y = 1;
-		// 	// console.log('drag');
-		// });
 
 		// Mouse event
 		window.addEventListener('mousedown', (event) => {
@@ -111,13 +87,8 @@ export default class Sketch {
 
 		window.addEventListener('mouseup', (event) => {
 			if (this.draggable !== null) {
-				// const idBalloon = this.draggable.userData.id;
-
 				this.lerpMultiplier = 0.05;
 
-				// this.children[idBalloon].targ.x = this.posXBalloon[idBalloon];
-				// this.children[idBalloon].targ.y = 0;
-				// this.draggable.position.set(this.posXBalloon[idBalloon], 0, 0);
 				this.draggable = null;
 			}
 		});
@@ -139,8 +110,8 @@ export default class Sketch {
 				for (let i = 0; i < this.found.length; i++) {
 					const index = this.found[i].object.userData.id;
 
-					this.letters[index].position.x = this.mouseMove.x;
-					this.letters[index].position.y = this.mouseMove.y;
+					this.children[index].mesh.position.x = this.mouseMove.x;
+					this.children[index].mesh.position.y = this.mouseMove.y;
 				}
 			}
 		}
@@ -241,19 +212,17 @@ export default class Sketch {
 
 	addDebug() {
 		const gui = new dat.GUI();
+		this.cannonDebugger = new CannonDebugger(this.scene, this.world, {});
 	}
 
 	addBalloon(mesh, posX = 0, index) {
+		// Create balloon
 		mesh.scale.set(0.3, 0.3, 0.3);
 		mesh.position.set(posX, 0, 0);
 		mesh.userData.draggable = true;
 		mesh.userData.id = index;
-
-		this.posXBalloon[index] = posX;
 		this.scene.add(mesh);
-
-		this.meshes.push(mesh);
-
+		// Add mesh to an array
 		this.children[index] = {
 			mesh,
 			targ: {
@@ -266,31 +235,32 @@ export default class Sketch {
 			},
 		};
 
-		// Add physics
-		// const meshShape = new CANNON.Box(new CANNON.Vec3(0.1, 0.1, 0.1));
+		// Add physics mesh on balloon
 		const meshShape = new CANNON.Sphere(0.11);
 		const meshBody = new CANNON.Body({
-			mass: 1,
-			linearFactor: new CANNON.Vec3(1, 1, 0),
-			linearDamping: 0.9,
-			// velocity: new CANNON.Vec3(1, 1, 0),
-			// fixedRotation: true,
+			mass: 100,
+			// linearFactor: new CANNON.Vec3(1, 1, 0),
+			// linearDamping: 0.9,
+			// velocity: new CANNON.Vec3(0.1, 0.1, 0),
 			angularFactor: new CANNON.Vec3(0, 0, 0),
-			// force: new CANNON.Vec3(0.1, 0.1, 0),
-			// inertia: new CANNON.Vec3(1, 1, 1),
 		});
 		meshBody.addShape(meshShape);
 		meshBody.position.x = mesh.position.x;
 		meshBody.position.y = mesh.position.y;
 		meshBody.position.z = mesh.position.z;
+		Object.assign(meshBody, { balloonID: index });
 		this.world.addBody(meshBody);
 		this.meshBodies.push(meshBody);
 
+		// Add bg plane for balloon
 		const planeGeo = new THREE.PlaneGeometry(0.2, 0.2);
 		const planeMat = new THREE.MeshNormalMaterial();
 		const planeMesh = new THREE.Mesh(planeGeo, planeMat);
 		planeMesh.position.set(mesh.position.x, 0, -0.15);
+		planeMesh.visible = false;
 		this.scene.add(planeMesh);
+
+		// Add physics to plane
 		const planeShape = new CANNON.Plane();
 		const planeBody = new CANNON.Body({
 			mass: 0,
@@ -301,7 +271,8 @@ export default class Sketch {
 		planeBody.position.z = planeMesh.position.z;
 		this.world.addBody(planeBody);
 
-		const localPivotBox = new CANNON.Vec3(0, 0, -0.5);
+		// Add constraint point between plane and balloon
+		const localPivotBox = new CANNON.Vec3(0, 0, -0.3);
 		const localPivotPlane = new CANNON.Vec3(0, 0, 0);
 		const constraints = new CANNON.PointToPointConstraint(
 			meshBody,
@@ -315,35 +286,41 @@ export default class Sketch {
 	onAnim() {
 		this.elapsedTime = this.clock.getElapsedTime();
 		if (this.model) {
+			// Grab/Drop anim
 			this.dragObject();
 
-			this.meshes.forEach((m, i) => {
-				this.children[i].curr.x = this.utils.lerp(
-					this.children[i].curr.x,
-					this.children[i].targ.x,
-					this.lerpMultiplier
-				);
-				this.children[i].curr.y = this.utils.lerp(
-					this.children[i].curr.y,
-					this.children[i].targ.y,
-					this.lerpMultiplier
+			// Balloon mouvement
+			const child = this.children.find(
+				(x) => x.mesh.userData.id === this.draggable
+			);
+
+			if (child && child.mesh) {
+				const meshBody = this.meshBodies.find(
+					(m) => m.balloonID === this.draggable
 				);
 
-				if (i === this.draggable) {
-					console.log('Drag', this.draggable);
-					this.meshBodies[i].position.x = m.position.x;
-					this.meshBodies[i].position.y = m.position.y;
-					this.meshBodies[i].position.z = m.position.z;
-					this.meshBodies[i].velocity.set(0, 0, 0);
-					this.meshBodies[i].angularVelocity.set(0, 0, 0);
-				} else {
-					m.position.set(
-						this.meshBodies[i].position.x,
-						this.meshBodies[i].position.y,
-						this.meshBodies[i].position.z
-					);
-				}
-			});
+				meshBody.position.x = child.mesh.position.x;
+				meshBody.position.y = child.mesh.position.y;
+				meshBody.position.z = child.mesh.position.z;
+				meshBody.velocity.set(0, 0, 0);
+				meshBody.angularVelocity.set(0, 0, 0);
+			}
+
+			const children = this.children.filter(
+				(x) => x.mesh.userData.id !== this.draggable
+			);
+
+			for (const child of children) {
+				const meshBody = this.meshBodies.find(
+					(m) => m.balloonID === child.mesh.userData.id
+				);
+
+				child.mesh.position.set(
+					meshBody.position.x,
+					meshBody.position.y,
+					meshBody.position.z
+				);
+			}
 		}
 	}
 
