@@ -110,8 +110,16 @@ export default class Sketch {
 				for (let i = 0; i < this.found.length; i++) {
 					const index = this.found[i].object.userData.id;
 
-					this.children[index].mesh.position.x = this.mouseMove.x;
-					this.children[index].mesh.position.y = this.mouseMove.y;
+					this.children[index].mesh.position.x = this.utils.lerp(
+						this.children[index].mesh.position.x,
+						this.mouseMove.x,
+						0.05
+					);
+					this.children[index].mesh.position.y = this.utils.lerp(
+						this.children[index].mesh.position.y,
+						this.mouseMove.y,
+						0.05
+					);
 				}
 			}
 		}
@@ -272,8 +280,8 @@ export default class Sketch {
 		this.world.addBody(planeBody);
 
 		// Add constraint point between plane and balloon
-		const localPivotBox = new CANNON.Vec3(0, 0, -0.3);
-		const localPivotPlane = new CANNON.Vec3(0, 0, 0);
+		const localPivotBox = new CANNON.Vec3(0, 0, -0.2);
+		const localPivotPlane = new CANNON.Vec3(0, 0, 0.2);
 		const constraints = new CANNON.PointToPointConstraint(
 			meshBody,
 			localPivotBox,
@@ -299,9 +307,21 @@ export default class Sketch {
 					(m) => m.balloonID === this.draggable
 				);
 
-				meshBody.position.x = child.mesh.position.x;
-				meshBody.position.y = child.mesh.position.y;
-				meshBody.position.z = child.mesh.position.z;
+				meshBody.position.x = this.utils.lerp(
+					meshBody.position.x,
+					child.mesh.position.x,
+					0.5
+				);
+				meshBody.position.y = this.utils.lerp(
+					meshBody.position.y,
+					child.mesh.position.y,
+					0.5
+				);
+				meshBody.position.z = this.utils.lerp(
+					meshBody.position.z,
+					child.mesh.position.z,
+					0.5
+				);
 				meshBody.velocity.set(0, 0, 0);
 				meshBody.angularVelocity.set(0, 0, 0);
 			}
@@ -315,10 +335,20 @@ export default class Sketch {
 					(m) => m.balloonID === child.mesh.userData.id
 				);
 
-				child.mesh.position.set(
+				child.mesh.position.x = this.utils.lerp(
+					child.mesh.position.x,
 					meshBody.position.x,
+					0.5
+				);
+				child.mesh.position.y = this.utils.lerp(
+					child.mesh.position.y,
 					meshBody.position.y,
-					meshBody.position.z
+					0.5
+				);
+				child.mesh.position.z = this.utils.lerp(
+					child.mesh.position.z,
+					meshBody.position.z,
+					0.5
 				);
 			}
 		}
