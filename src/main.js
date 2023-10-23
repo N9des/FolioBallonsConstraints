@@ -99,32 +99,6 @@ export default class Sketch {
 		});
 	}
 
-	getIntersect(pos) {
-		this.raycaster.setFromCamera(pos, this.camera);
-		return this.raycaster.intersectObjects(this.letters);
-	}
-
-	dragObject() {
-		if (this.draggable !== null) {
-			if (this.found !== null && this.found.length > 0) {
-				for (let i = 0; i < this.found.length; i++) {
-					const index = this.found[i].object.userData.id;
-
-					this.children[index].mesh.position.x = this.utils.lerp(
-						this.children[index].mesh.position.x,
-						this.mouseMove.x,
-						0.05
-					);
-					this.children[index].mesh.position.y = this.utils.lerp(
-						this.children[index].mesh.position.y,
-						this.mouseMove.y,
-						0.05
-					);
-				}
-			}
-		}
-	}
-
 	addRaycaster() {
 		this.raycaster = new THREE.Raycaster();
 	}
@@ -219,8 +193,8 @@ export default class Sketch {
 	}
 
 	addDebug() {
+		// this.cannonDebugger = new CannonDebugger(this.scene, this.world, {});
 		const gui = new dat.GUI();
-		this.cannonDebugger = new CannonDebugger(this.scene, this.world, {});
 	}
 
 	addBalloon(mesh, posX = 0, index) {
@@ -244,12 +218,10 @@ export default class Sketch {
 		};
 
 		// Add physics mesh on balloon
-		const meshShape = new CANNON.Sphere(0.11);
+		const meshShape = new CANNON.Sphere(0.115);
 		const meshBody = new CANNON.Body({
-			mass: 100,
-			// linearFactor: new CANNON.Vec3(1, 1, 0),
-			// linearDamping: 0.9,
-			// velocity: new CANNON.Vec3(0.1, 0.1, 0),
+			mass: 1,
+			velocity: new CANNON.Vec3(0.1, 0.1, 0),
 			angularFactor: new CANNON.Vec3(0, 0, 0),
 		});
 		meshBody.addShape(meshShape);
@@ -291,9 +263,53 @@ export default class Sketch {
 		this.world.addConstraint(constraints);
 	}
 
+	getIntersect(pos) {
+		this.raycaster.setFromCamera(pos, this.camera);
+		return this.raycaster.intersectObjects(this.letters);
+	}
+
+	dragObject() {
+		if (this.draggable !== null) {
+			if (this.found !== null && this.found.length > 0) {
+				for (let i = 0; i < this.found.length; i++) {
+					const index = this.found[i].object.userData.id;
+
+					this.children[index].mesh.position.x = this.utils.lerp(
+						this.children[index].mesh.position.x,
+						this.mouseMove.x,
+						0.05
+					);
+					this.children[index].mesh.position.y = this.utils.lerp(
+						this.children[index].mesh.position.y,
+						this.mouseMove.y,
+						0.05
+					);
+				}
+			}
+		}
+	}
+
+	staticAnim() {
+		this.children.forEach((child, idx) => {
+			if (
+				child.mesh instanceof THREE.Mesh &&
+				child.mesh.userData.id !== this.draggable
+			) {
+				// Move mesh
+				child.mesh.rotation.z =
+					Math.sin(this.elapsedTime * this.speedsRot[idx]) * 0.05;
+				child.mesh.position.y =
+					Math.sin(this.elapsedTime * this.speedsPos[idx]) * 0.03;
+			}
+		});
+	}
+
 	onAnim() {
 		this.elapsedTime = this.clock.getElapsedTime();
 		if (this.model) {
+			// Anim static
+			this.staticAnim();
+
 			// Grab/Drop anim
 			this.dragObject();
 
@@ -373,8 +389,9 @@ export default class Sketch {
 
 		// Update World
 		this.world.step(delta);
-		this.cannonDebugger.update();
+		// this.cannonDebugger.update();
 
+		// Animations
 		this.onAnim();
 
 		// Update controls
