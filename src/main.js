@@ -302,7 +302,6 @@ export default class Sketch {
 	}
 
 	staticAnim() {
-		console.log(this.clock.oldTime / 1000);
 		this.letters.forEach((child, idx) => {
 			const rotationZ = Math.sin(this.elapsedTime * this.speedsRot[idx]) * 0.05;
 			const positionY = Math.sin(this.elapsedTime * this.speedsPos[idx]) * 0.03;
