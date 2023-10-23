@@ -34,6 +34,8 @@ export default class Sketch {
 
 		// Init values
 		this.clock = new THREE.Clock();
+		this.delta = 0;
+		this.down = false;
 		this.world = null;
 		this.meshBodies = [];
 		this.model = null;
@@ -83,6 +85,8 @@ export default class Sketch {
 					this.draggable = this.found[0].object.userData.id;
 				}
 			}
+
+			this.down = true;
 		});
 
 		window.addEventListener('mouseup', (event) => {
@@ -90,6 +94,10 @@ export default class Sketch {
 				this.lerpMultiplier = 0.05;
 
 				this.draggable = null;
+
+				setTimeout(() => {
+					this.down = false;
+				}, 1000);
 			}
 		});
 
@@ -193,7 +201,7 @@ export default class Sketch {
 	}
 
 	addDebug() {
-		// this.cannonDebugger = new CannonDebugger(this.scene, this.world, {});
+		this.cannonDebugger = new CannonDebugger(this.scene, this.world, {});
 		const gui = new dat.GUI();
 	}
 
@@ -218,13 +226,17 @@ export default class Sketch {
 		};
 
 		// Add physics mesh on balloon
-		const meshShape = new CANNON.Sphere(0.115);
+		const meshShape = new CANNON.Sphere(0.11);
+		const meshShapeTop = new CANNON.Sphere(0.08);
+		const meshShapeBottom = new CANNON.Sphere(0.08);
 		const meshBody = new CANNON.Body({
 			mass: 1,
 			velocity: new CANNON.Vec3(0.1, 0.1, 0),
 			angularFactor: new CANNON.Vec3(0, 0, 0),
 		});
-		meshBody.addShape(meshShape);
+		meshBody.addShape(meshShape, new CANNON.Vec3(0, 0, 0));
+		meshBody.addShape(meshShapeTop, new CANNON.Vec3(0, 0.05, 0));
+		meshBody.addShape(meshShapeBottom, new CANNON.Vec3(0, -0.05, 0));
 		meshBody.position.x = mesh.position.x;
 		meshBody.position.y = mesh.position.y;
 		meshBody.position.z = mesh.position.z;
@@ -277,12 +289,12 @@ export default class Sketch {
 					this.children[index].mesh.position.x = this.utils.lerp(
 						this.children[index].mesh.position.x,
 						this.mouseMove.x,
-						0.05
+						0.01
 					);
 					this.children[index].mesh.position.y = this.utils.lerp(
 						this.children[index].mesh.position.y,
 						this.mouseMove.y,
-						0.05
+						0.01
 					);
 				}
 			}
@@ -290,83 +302,72 @@ export default class Sketch {
 	}
 
 	staticAnim() {
-		this.children.forEach((child, idx) => {
-			if (
-				child.mesh instanceof THREE.Mesh &&
-				child.mesh.userData.id !== this.draggable
-			) {
+		console.log(this.clock.oldTime / 1000);
+		this.letters.forEach((child, idx) => {
+			const rotationZ = Math.sin(this.elapsedTime * this.speedsRot[idx]) * 0.05;
+			const positionY = Math.sin(this.elapsedTime * this.speedsPos[idx]) * 0.03;
+			if (this.draggable === null && !this.down) {
 				// Move mesh
-				child.mesh.rotation.z =
-					Math.sin(this.elapsedTime * this.speedsRot[idx]) * 0.05;
-				child.mesh.position.y =
-					Math.sin(this.elapsedTime * this.speedsPos[idx]) * 0.03;
+				child.rotation.z = rotationZ;
+				child.position.y = positionY;
+
+				this.meshBodies[idx].position.y = positionY;
 			}
 		});
+	}
+
+	moveBalloons() {
+		// Balloon mouvement
+		const child = this.children.find(
+			(x) => x.mesh.userData.id === this.draggable
+		);
+
+		if (child && child.mesh) {
+			const meshBody = this.meshBodies.find(
+				(m) => m.balloonID === this.draggable
+			);
+
+			meshBody.position.x = child.mesh.position.x;
+			meshBody.position.y = child.mesh.position.y;
+			meshBody.position.z = child.mesh.position.z;
+			meshBody.velocity.set(0, 0, 0);
+			meshBody.angularVelocity.set(0, 0, 0);
+		}
+
+		const children = this.children.filter(
+			(x) => x.mesh.userData.id !== this.draggable
+		);
+
+		for (const child of children) {
+			const meshBody = this.meshBodies.find(
+				(m) => m.balloonID === child.mesh.userData.id
+			);
+
+			child.mesh.position.x = this.utils.lerp(
+				child.mesh.position.x,
+				meshBody.position.x,
+				0.5
+			);
+			child.mesh.position.y = this.utils.lerp(
+				child.mesh.position.y,
+				meshBody.position.y,
+				0.5
+			);
+			child.mesh.position.z = this.utils.lerp(
+				child.mesh.position.z,
+				meshBody.position.z,
+				0.5
+			);
+		}
 	}
 
 	onAnim() {
 		this.elapsedTime = this.clock.getElapsedTime();
 		if (this.model) {
-			// Anim static
-			this.staticAnim();
-
-			// Grab/Drop anim
 			this.dragObject();
-
-			// Balloon mouvement
-			const child = this.children.find(
-				(x) => x.mesh.userData.id === this.draggable
-			);
-
-			if (child && child.mesh) {
-				const meshBody = this.meshBodies.find(
-					(m) => m.balloonID === this.draggable
-				);
-
-				meshBody.position.x = this.utils.lerp(
-					meshBody.position.x,
-					child.mesh.position.x,
-					0.5
-				);
-				meshBody.position.y = this.utils.lerp(
-					meshBody.position.y,
-					child.mesh.position.y,
-					0.5
-				);
-				meshBody.position.z = this.utils.lerp(
-					meshBody.position.z,
-					child.mesh.position.z,
-					0.5
-				);
-				meshBody.velocity.set(0, 0, 0);
-				meshBody.angularVelocity.set(0, 0, 0);
-			}
-
-			const children = this.children.filter(
-				(x) => x.mesh.userData.id !== this.draggable
-			);
-
-			for (const child of children) {
-				const meshBody = this.meshBodies.find(
-					(m) => m.balloonID === child.mesh.userData.id
-				);
-
-				child.mesh.position.x = this.utils.lerp(
-					child.mesh.position.x,
-					meshBody.position.x,
-					0.5
-				);
-				child.mesh.position.y = this.utils.lerp(
-					child.mesh.position.y,
-					meshBody.position.y,
-					0.5
-				);
-				child.mesh.position.z = this.utils.lerp(
-					child.mesh.position.z,
-					meshBody.position.z,
-					0.5
-				);
-			}
+			this.moveBalloons();
+			this.staticAnim();
+			// Grab/Drop anim
 		}
 	}
 
@@ -385,11 +386,11 @@ export default class Sketch {
 	}
 
 	render() {
-		const delta = Math.min(this.clock.getDelta(), 0.1);
+		this.delta = Math.min(this.clock.getDelta(), 0.1);
 
 		// Update World
-		this.world.step(delta);
-		// this.cannonDebugger.update();
+		this.world.step(this.delta);
+		this.cannonDebugger.update();
 
 		// Animations
 		this.onAnim();
