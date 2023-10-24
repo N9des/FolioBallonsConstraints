@@ -215,13 +215,18 @@ export default class Sketch {
 		// Add mesh to an array
 		this.children[index] = {
 			mesh,
+			posX,
 			targ: {
 				x: mesh.position.x,
 				y: mesh.position.y,
+				z: mesh.position.z,
+				zRot: mesh.rotation.z,
 			},
 			curr: {
 				x: mesh.position.x,
 				y: mesh.position.y,
+				z: mesh.position.z,
+				zRot: mesh.rotation.z,
 			},
 		};
 
@@ -286,32 +291,17 @@ export default class Sketch {
 				for (let i = 0; i < this.found.length; i++) {
 					const index = this.found[i].object.userData.id;
 
-					this.children[index].mesh.position.x = this.utils.lerp(
-						this.children[index].mesh.position.x,
-						this.mouseMove.x,
-						0.01
-					);
-					this.children[index].mesh.position.y = this.utils.lerp(
-						this.children[index].mesh.position.y,
-						this.mouseMove.y,
-						0.01
-					);
+					this.children[index].targ.x = this.mouseMove.x;
+					this.children[index].targ.y = this.mouseMove.y;
 				}
 			}
 		}
 	}
 
 	staticAnim() {
-		this.letters.forEach((child, idx) => {
-			const rotationZ = Math.sin(this.elapsedTime * this.speedsRot[idx]) * 0.05;
-			const positionY = Math.sin(this.elapsedTime * this.speedsPos[idx]) * 0.03;
-			if (this.draggable === null && !this.down) {
-				// Move mesh
-				child.rotation.z = rotationZ;
-				child.position.y = positionY;
-
-				this.meshBodies[idx].position.y = positionY;
-			}
+		this.children.forEach((child, idx) => {
+			const rotationZ = Math.sin(this.elapsedTime * this.speedsRot[idx]) * 0.1;
+			child.targ.zRot = rotationZ;
 		});
 	}
 
@@ -326,9 +316,9 @@ export default class Sketch {
 				(m) => m.balloonID === this.draggable
 			);
 
-			meshBody.position.x = child.mesh.position.x;
-			meshBody.position.y = child.mesh.position.y;
-			meshBody.position.z = child.mesh.position.z;
+			meshBody.position.x = child.curr.x;
+			meshBody.position.y = child.curr.y;
+			meshBody.position.z = child.curr.z;
 			meshBody.velocity.set(0, 0, 0);
 			meshBody.angularVelocity.set(0, 0, 0);
 		}
@@ -342,31 +332,36 @@ export default class Sketch {
 				(m) => m.balloonID === child.mesh.userData.id
 			);
 
-			child.mesh.position.x = this.utils.lerp(
-				child.mesh.position.x,
-				meshBody.position.x,
-				0.5
-			);
-			child.mesh.position.y = this.utils.lerp(
-				child.mesh.position.y,
-				meshBody.position.y,
-				0.5
-			);
-			child.mesh.position.z = this.utils.lerp(
-				child.mesh.position.z,
-				meshBody.position.z,
-				0.5
-			);
+			child.targ.x = meshBody.position.x;
+			child.targ.y = meshBody.position.y;
+			child.targ.z = meshBody.position.z;
 		}
 	}
 
 	onAnim() {
 		this.elapsedTime = this.clock.getElapsedTime();
 		if (this.model) {
-			this.dragObject();
-			this.moveBalloons();
+			this.children.forEach((child, idx) => {
+				child.curr.x = this.utils.lerp(child.curr.x, child.targ.x, 0.5);
+				child.curr.y = this.utils.lerp(child.curr.y, child.targ.y, 0.5);
+				child.curr.z = this.utils.lerp(child.curr.z, child.targ.z, 0.5);
+				child.curr.zRot = this.utils.lerp(
+					child.curr.zRot,
+					child.targ.zRot,
+					0.5
+				);
+
+				child.mesh.position.x = child.curr.x;
+				child.mesh.position.y = child.curr.y;
+				child.mesh.position.z = child.curr.z;
+				child.mesh.rotation.z = child.curr.zRot;
+			});
+
 			this.staticAnim();
 			// Grab/Drop anim
+			this.dragObject();
+			// Move Balloons out of drag
+			this.moveBalloons();
 		}
 	}
 
