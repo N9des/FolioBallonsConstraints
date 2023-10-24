@@ -84,6 +84,8 @@ export default class Sketch {
 				if (this.found[0].object.userData.draggable) {
 					this.draggable = this.found[0].object.userData.id;
 				}
+
+				document.body.style.cursor = 'grabbing';
 			}
 
 			this.down = true;
@@ -95,6 +97,8 @@ export default class Sketch {
 
 				this.draggable = null;
 
+				document.body.style.cursor = 'grab';
+
 				setTimeout(() => {
 					this.down = false;
 				}, 1000);
@@ -104,6 +108,14 @@ export default class Sketch {
 		window.addEventListener('mousemove', (event) => {
 			this.mouseMove.x = (event.clientX / this.sizes.width) * 2 - 1;
 			this.mouseMove.y = -(event.clientY / this.sizes.height) * 2 + 1;
+
+			const hover = this.getIntersect(this.mouseMove);
+
+			if (hover.length > 0 && this.draggable === null) {
+				document.body.style.cursor = 'grab';
+			} else if (this.draggable === null) {
+				document.body.style.cursor = 'default';
+			}
 		});
 	}
 
@@ -235,7 +247,7 @@ export default class Sketch {
 		const meshShapeTop = new CANNON.Sphere(0.08);
 		const meshShapeBottom = new CANNON.Sphere(0.08);
 		const meshBody = new CANNON.Body({
-			mass: 1,
+			mass: 1000,
 			velocity: new CANNON.Vec3(0.1, 0.1, 0),
 			angularFactor: new CANNON.Vec3(0, 0, 0),
 		});
@@ -341,9 +353,21 @@ export default class Sketch {
 	onAnim() {
 		this.elapsedTime = this.clock.getElapsedTime();
 		if (this.model) {
+			this.staticAnim();
+			// Grab/Drop anim
+			this.dragObject();
+			// Move Balloons out of drag
+			this.moveBalloons();
+
 			this.children.forEach((child, idx) => {
-				child.curr.x = this.utils.lerp(child.curr.x, child.targ.x, 0.5);
-				child.curr.y = this.utils.lerp(child.curr.y, child.targ.y, 0.5);
+				let lerpSpeed = 0.3;
+
+				if (idx === this.draggable) {
+					lerpSpeed = 0.05;
+				}
+
+				child.curr.x = this.utils.lerp(child.curr.x, child.targ.x, lerpSpeed);
+				child.curr.y = this.utils.lerp(child.curr.y, child.targ.y, lerpSpeed);
 				child.curr.z = this.utils.lerp(child.curr.z, child.targ.z, 0.5);
 				child.curr.zRot = this.utils.lerp(
 					child.curr.zRot,
@@ -356,12 +380,6 @@ export default class Sketch {
 				child.mesh.position.z = child.curr.z;
 				child.mesh.rotation.z = child.curr.zRot;
 			});
-
-			this.staticAnim();
-			// Grab/Drop anim
-			this.dragObject();
-			// Move Balloons out of drag
-			this.moveBalloons();
 		}
 	}
 
